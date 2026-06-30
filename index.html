@@ -28,7 +28,7 @@
             border: 4px solid #34495e;
             border-radius: 10px;
             box-shadow: 0 10px 20px rgba(0,0,0,0.5);
-            background-color: #87CEEB; /* Warna cadangan kalau gambar telat muat */
+            background-color: #87CEEB;
         }
 
         #ui-layer {
@@ -75,43 +75,130 @@
         const volumeBar = document.getElementById("volume-bar");
 
         // ==========================================
-        // 🔴 BAGIAN TEMPLATE ASSET GAMBAR
+        // 🎨 FUNCTION UNTUK MENGGAMBAR ASSET
         // ==========================================
-        const imgBackground = new Image();
-        imgBackground.src = "background-kamu.png"; // <-- Ganti dengan nama file pixel art awan/rumput kamu
-
-        const imgBurung = new Image();
-        imgBurung.src = "muka-burung-kamu.png"; // <-- Ganti dengan nama file karakter burung (.png transparan)
-
-        const imgPipaAtas = new Image();
-        imgPipaAtas.src = "pipa-atas-kamu.png"; // <-- Ganti dengan nama file pipa atas
-
-        const imgPipaBawah = new Image();
-        imgPipaBawah.src = "pipa-bawah-kamu.png"; // <-- Ganti dengan nama file pipa bawah
+        
+        // Fungsi menggambar burung transparan (tanpa background)
+        function drawBird(x, y, width, height) {
+            ctx.save();
+            ctx.translate(x, y);
+            
+            // Kepala burung (kuning)
+            ctx.fillStyle = "#FFD700";
+            ctx.beginPath();
+            ctx.arc(0, -8, 12, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Mata
+            ctx.fillStyle = "#000";
+            ctx.beginPath();
+            ctx.arc(4, -10, 3, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.fillStyle = "#FFF";
+            ctx.beginPath();
+            ctx.arc(5, -9, 1.5, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Paruh (merah)
+            ctx.fillStyle = "#FF6347";
+            ctx.beginPath();
+            ctx.moveTo(10, -8);
+            ctx.lineTo(16, -7);
+            ctx.lineTo(10, -5);
+            ctx.closePath();
+            ctx.fill();
+            
+            // Badan burung (kuning)
+            ctx.fillStyle = "#FFD700";
+            ctx.beginPath();
+            ctx.ellipse(0, 5, 10, 14, 0, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Sayap (oranye)
+            ctx.fillStyle = "#FFA500";
+            ctx.beginPath();
+            ctx.ellipse(-8, 5, 6, 10, -0.3, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.restore();
+        }
+        
+        // Fungsi menggambar background (awan & rumput)
+        function drawBackground(x, y) {
+            // Langit (gradient biru)
+            const gradient = ctx.createLinearGradient(x, y, x, y + canvas.height);
+            gradient.addColorStop(0, "#87CEEB");
+            gradient.addColorStop(1, "#E0F6FF");
+            ctx.fillStyle = gradient;
+            ctx.fillRect(x, y, canvas.width, canvas.height);
+            
+            // Awan
+            drawCloud(x + 50, y + 60, 30);
+            drawCloud(x + 200, y + 100, 25);
+            drawCloud(x + 350, y + 80, 28);
+            
+            // Rumput di bawah
+            ctx.fillStyle = "#228B22";
+            ctx.fillRect(x, y + canvas.height - 40, canvas.width, 40);
+            
+            // Detail rumput
+            ctx.fillStyle = "#32CD32";
+            for (let i = 0; i < 20; i++) {
+                ctx.fillRect(x + i * 20, y + canvas.height - 35, 3, 15);
+            }
+        }
+        
+        function drawCloud(x, y, size) {
+            ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
+            ctx.beginPath();
+            ctx.arc(x, y, size, 0, Math.PI * 2);
+            ctx.arc(x + size * 0.8, y - size * 0.3, size * 0.7, 0, Math.PI * 2);
+            ctx.arc(x + size * 1.6, y, size * 0.8, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        
+        // Fungsi menggambar pipa
+        function drawPipe(x, topHeight, gapHeight, isTop) {
+            ctx.fillStyle = "#228B22";
+            ctx.shadowColor = "rgba(0,0,0,0.3)";
+            ctx.shadowBlur = 5;
+            
+            if (isTop) {
+                ctx.fillRect(x, 0, 60, topHeight);
+                // Border pipa
+                ctx.strokeStyle = "#1a6b1a";
+                ctx.lineWidth = 3;
+                ctx.strokeRect(x, 0, 60, topHeight);
+            } else {
+                ctx.fillRect(x, topHeight + gapHeight, 60, canvas.height - (topHeight + gapHeight));
+                ctx.strokeStyle = "#1a6b1a";
+                ctx.lineWidth = 3;
+                ctx.strokeRect(x, topHeight + gapHeight, 60, canvas.height - (topHeight + gapHeight));
+            }
+            
+            ctx.shadowColor = "transparent";
+        }
+        
         // ==========================================
 
         let frames = 0, score = 0, gameSpeed = 3;
         let isGameOver = false, isPlaying = false;
-        
-        // Variabel untuk menggeser background (Looping)
-        let bgX = 0; 
-        
+        let bgX = 0;
         let audioContext, analyser, microphone, dataArray, volume = 0;
-        
-        // Sensitivitas mic (Makin kecil makin sensitif)
-        const MIC_THRESHOLD = 20; 
+        const MIC_THRESHOLD = 20;
 
         const bird = {
-            x: 50, y: 250, 
-            width: 40, height: 40, 
+            x: 50, y: 250,
+            width: 40, height: 40,
             velocity: 0, gravity: 0.25, lift: -4,
-            
+
             draw() {
-                ctx.drawImage(imgBurung, this.x - this.width/2, this.y - this.height/2, this.width, this.height);
+                drawBird(this.x, this.y, this.width, this.height);
             },
-            
+
             update() {
-                if (volume > MIC_THRESHOLD) this.velocity = this.lift; 
+                if (volume > MIC_THRESHOLD) this.velocity = this.lift;
                 this.velocity += this.gravity;
                 this.y += this.velocity;
                 if (this.y + this.height / 2 >= canvas.height || this.y - this.height / 2 <= 0) endGame();
@@ -119,23 +206,23 @@
         };
 
         const pipes = [];
-        const pipeWidth = 60; 
-        const pipeGap = 160; // <-- Celah antar pipa (besarkan kalau terlalu sulit)
+        const pipeWidth = 60;
+        const pipeGap = 160;
 
         function drawPipes() {
             for (let i = 0; i < pipes.length; i++) {
                 let p = pipes[i];
-                
+
                 // Gambar Pipa Atas & Bawah
-                ctx.drawImage(imgPipaAtas, p.x, 0, pipeWidth, p.top);
-                ctx.drawImage(imgPipaBawah, p.x, p.top + pipeGap, pipeWidth, canvas.height - (p.top + pipeGap));
+                drawPipe(p.x, p.top, pipeGap, true);
+                drawPipe(p.x, p.top, pipeGap, false);
 
                 p.x -= gameSpeed;
 
                 // Deteksi tabrakan
                 if (
-                    bird.x + bird.width / 2 > p.x && 
-                    bird.x - bird.width / 2 < p.x + pipeWidth && 
+                    bird.x + bird.width / 2 > p.x &&
+                    bird.x - bird.width / 2 < p.x + pipeWidth &&
                     (bird.y - bird.height / 2 < p.top || bird.y + bird.height / 2 > p.top + pipeGap)
                 ) {
                     endGame();
@@ -177,18 +264,16 @@
         function gameLoop() {
             if (!isPlaying) return;
 
-            // --- LOGIKA BACKGROUND LOOPING ---
-            bgX -= 1; // Kecepatan geser background (lebih lambat dari pipa)
-            if (bgX <= -canvas.width) {
-                bgX = 0; // Reset ke posisi awal jika gambar pertama sudah habis
-            }
-
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
-            // Gambar background 2 kali bersebelahan
-            ctx.drawImage(imgBackground, bgX, 0, canvas.width, canvas.height);
-            ctx.drawImage(imgBackground, bgX + canvas.width, 0, canvas.width, canvas.height);
-            // ----------------------------------
+
+            // Gambar background dengan bergerak
+            drawBackground(bgX, 0);
+            drawBackground(bgX + canvas.width, 0);
+
+            bgX -= 1;
+            if (bgX <= -canvas.width) {
+                bgX = 0;
+            }
 
             bird.draw();
             bird.update();
@@ -211,17 +296,27 @@
         }
 
         function endGame() {
-            isGameOver = true; isPlaying = false;
-            uiLayer.style.display = "flex"; gameOverText.style.display = "block";
-            finalScoreText.style.display = "block"; finalScoreText.innerText = "Skor Akhir: " + score;
+            isGameOver = true;
+            isPlaying = false;
+            uiLayer.style.display = "flex";
+            gameOverText.style.display = "block";
+            finalScoreText.style.display = "block";
+            finalScoreText.innerText = "Skor Akhir: " + score;
             startBtn.innerText = "MAIN LAGI WOI!";
         }
 
         function resetGame() {
-            bird.y = 250; bird.velocity = 0; pipes.length = 0; score = 0; frames = 0;
-            bgX = 0; // Reset posisi background juga
-            isGameOver = false; isPlaying = true;
-            uiLayer.style.display = "none"; gameOverText.style.display = "none"; finalScoreText.style.display = "none";
+            bird.y = 250;
+            bird.velocity = 0;
+            pipes.length = 0;
+            score = 0;
+            frames = 0;
+            bgX = 0;
+            isGameOver = false;
+            isPlaying = true;
+            uiLayer.style.display = "none";
+            gameOverText.style.display = "none";
+            finalScoreText.style.display = "none";
         }
 
         startBtn.addEventListener("click", async () => {
@@ -229,7 +324,9 @@
                 startBtn.innerText = "MENYIAPKAN MIC...";
                 await setupAudio();
             }
-            resetGame(); getVolume(); gameLoop();
+            resetGame();
+            getVolume();
+            gameLoop();
         });
     </script>
 </body>
