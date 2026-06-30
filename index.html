@@ -187,6 +187,7 @@
         let bgX = 0;
         let audioContext, analyser, microphone, dataArray, volume = 0;
         const MIC_THRESHOLD = 20;
+        const GRASS_HEIGHT = 40;
 
         const bird = {
             x: 50, y: 250,
@@ -201,7 +202,8 @@
                 if (volume > MIC_THRESHOLD) this.velocity = this.lift;
                 this.velocity += this.gravity;
                 this.y += this.velocity;
-                if (this.y + this.height / 2 >= canvas.height || this.y - this.height / 2 <= 0) endGame();
+                // FIX: Deteksi tabrakan dengan rumput dan langit
+                if (this.y + this.height / 2 >= canvas.height - GRASS_HEIGHT || this.y - this.height / 2 <= 0) endGame();
             }
         };
 
@@ -228,7 +230,11 @@
                     endGame();
                 }
 
-                if (p.x === bird.x) score++;
+                // FIX: Gunakan >= untuk scoring yang lebih reliable
+                if (p.x + pipeWidth < bird.x && !p.scored) {
+                    p.scored = true;
+                    score++;
+                }
             }
             if (pipes.length > 0 && pipes[0].x < -pipeWidth) pipes.shift();
         }
@@ -250,6 +256,8 @@
 
         function getVolume() {
             if (!isPlaying) return;
+            // FIX: Guard clause untuk analyser
+            if (!analyser) return;
             analyser.getByteFrequencyData(dataArray);
             let sum = 0;
             for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
@@ -280,8 +288,8 @@
 
             // Munculkan pipa setiap 100 frame
             if (frames % 100 === 0) {
-                let topPipeHeight = Math.random() * (canvas.height - pipeGap - 50) + 20;
-                pipes.push({ x: canvas.width, top: topPipeHeight });
+                let topPipeHeight = Math.random() * (canvas.height - pipeGap - GRASS_HEIGHT - 50) + 20;
+                pipes.push({ x: canvas.width, top: topPipeHeight, scored: false });
             }
 
             drawPipes();
@@ -317,6 +325,7 @@
             uiLayer.style.display = "none";
             gameOverText.style.display = "none";
             finalScoreText.style.display = "none";
+            gameLoop();
         }
 
         startBtn.addEventListener("click", async () => {
@@ -325,8 +334,6 @@
                 await setupAudio();
             }
             resetGame();
-            getVolume();
-            gameLoop();
         });
     </script>
 </body>
