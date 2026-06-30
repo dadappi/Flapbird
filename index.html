@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flappy Teriak - IT Club</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #2c3e50;
+            color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        h1 { color: #f1c40f; margin-bottom: 5px; text-shadow: 2px 2px 0px #000; }
+        p { margin-top: 0; color: #bdc3c7; }
+        
+        #game-container { position: relative; }
+
+        canvas {
+            border: 4px solid #34495e;
+            border-radius: 10px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.5);
+            background-color: #87CEEB; /* Warna cadangan kalau gambar telat muat */
+        }
+
+        #ui-layer {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            background: rgba(0, 0, 0, 0.6); border-radius: 10px;
+        }
+
+        button {
+            padding: 15px 40px; font-size: 24px; font-weight: bold;
+            background-color: #e74c3c; color: white; border: none;
+            border-radius: 50px; cursor: pointer; box-shadow: 0 5px 0 #c0392b;
+        }
+        button:active { transform: translateY(5px); box-shadow: none; }
+
+        #volume-bar-container { width: 400px; height: 20px; background-color: #333; border-radius: 10px; margin-top: 20px; overflow: hidden; border: 2px solid #fff; }
+        #volume-bar { height: 100%; width: 0%; background-color: #2ecc71; transition: width 0.1s; }
+    </style>
+</head>
+<body>
+
+    <h1>🐦 Flappy Teriak 🗣️</h1>
+    <p>Diam = Jatuh | Ngomong = Terbang | TERIAK = TERBANG TINGGI!</p>
+
+    <div id="game-container">
+        <canvas id="gameCanvas" width="400" height="500"></canvas>
+        <div id="ui-layer">
+            <h2 id="game-over-text" style="display: none; color: #e74c3c; font-size: 40px; text-shadow: 2px 2px #000;">YAH NABRAK!</h2>
+            <h3 id="final-score" style="display: none; font-size: 24px;">Skor: 0</h3>
+            <button id="start-btn">IZINKAN MIC & MULAI</button>
+        </div>
+    </div>
+
+    <div style="margin-top: 10px;">Indikator Suara Kamu:</div>
+    <div id="volume-bar-container"><div id="volume-bar"></div></div>
+
+    <script>
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+        const startBtn = document.getElementById("start-btn");
+        const uiLayer = document.getElementById("ui-layer");
+        const gameOverText = document.getElementById("game-over-text");
+        const finalScoreText = document.getElementById("final-score");
+        const volumeBar = document.getElementById("volume-bar");
+
+        // ==========================================
+        // 🔴 BAGIAN TEMPLATE ASSET GAMBAR
+        // ==========================================
+        const imgBackground = new Image();
+        imgBackground.src = "background-kamu.png"; // <-- Ganti dengan nama file pixel art awan/rumput kamu
+
+        const imgBurung = new Image();
+        imgBurung.src = "muka-burung-kamu.png"; // <-- Ganti dengan nama file karakter burung (.png transparan)
+
+        const imgPipaAtas = new Image();
+        imgPipaAtas.src = "pipa-atas-kamu.png"; // <-- Ganti dengan nama file pipa atas
+
+        const imgPipaBawah = new Image();
+        imgPipaBawah.src = "pipa-bawah-kamu.png"; // <-- Ganti dengan nama file pipa bawah
+        // ==========================================
+
+        let frames = 0, score = 0, gameSpeed = 3;
+        let isGameOver = false, isPlaying = false;
+        
+        // Variabel untuk menggeser background (Looping)
+        let bgX = 0; 
+        
+        let audioContext, analyser, microphone, dataArray, volume = 0;
+        
+        // Sensitivitas mic (Makin kecil makin sensitif)
+        const MIC_THRESHOLD = 20; 
+
+        const bird = {
+            x: 50, y: 250, 
+            width: 40, height: 40, 
+            velocity: 0, gravity: 0.25, lift: -4,
+            
+            draw() {
+                ctx.drawImage(imgBurung, this.x - this.width/2, this.y - this.height/2, this.width, this.height);
+            },
+            
+            update() {
+                if (volume > MIC_THRESHOLD) this.velocity = this.lift; 
+                this.velocity += this.gravity;
+                this.y += this.velocity;
+                if (this.y + this.height / 2 >= canvas.height || this.y - this.height / 2 <= 0) endGame();
+            }
+        };
+
+        const pipes = [];
+        const pipeWidth = 60; 
+        const pipeGap = 160; // <-- Celah antar pipa (besarkan kalau terlalu sulit)
+
+        function drawPipes() {
+            for (let i = 0; i < pipes.length; i++) {
+                let p = pipes[i];
+                
+                // Gambar Pipa Atas & Bawah
+                ctx.drawImage(imgPipaAtas, p.x, 0, pipeWidth, p.top);
+                ctx.drawImage(imgPipaBawah, p.x, p.top + pipeGap, pipeWidth, canvas.height - (p.top + pipeGap));
+
+                p.x -= gameSpeed;
+
+                // Deteksi tabrakan
+                if (
+                    bird.x + bird.width / 2 > p.x && 
+                    bird.x - bird.width / 2 < p.x + pipeWidth && 
+                    (bird.y - bird.height / 2 < p.top || bird.y + bird.height / 2 > p.top + pipeGap)
+                ) {
+                    endGame();
+                }
+
+                if (p.x === bird.x) score++;
+            }
+            if (pipes.length > 0 && pipes[0].x < -pipeWidth) pipes.shift();
+        }
+
+        async function setupAudio() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                analyser = audioContext.createAnalyser();
+                microphone = audioContext.createMediaStreamSource(stream);
+                microphone.connect(analyser);
+                analyser.fftSize = 256;
+                dataArray = new Uint8Array(analyser.frequencyBinCount);
+                getVolume();
+            } catch (err) {
+                alert("Gagal akses Mikrofon! Pastikan kamu memberi izin browser.");
+            }
+        }
+
+        function getVolume() {
+            if (!isPlaying) return;
+            analyser.getByteFrequencyData(dataArray);
+            let sum = 0;
+            for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
+            volume = sum / dataArray.length;
+
+            volumeBar.style.width = Math.min(volume * 2, 100) + "%";
+            volumeBar.style.backgroundColor = volume > MIC_THRESHOLD ? "#e74c3c" : "#2ecc71";
+
+            requestAnimationFrame(getVolume);
+        }
+
+        function gameLoop() {
+            if (!isPlaying) return;
+
+            // --- LOGIKA BACKGROUND LOOPING ---
+            bgX -= 1; // Kecepatan geser background (lebih lambat dari pipa)
+            if (bgX <= -canvas.width) {
+                bgX = 0; // Reset ke posisi awal jika gambar pertama sudah habis
+            }
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Gambar background 2 kali bersebelahan
+            ctx.drawImage(imgBackground, bgX, 0, canvas.width, canvas.height);
+            ctx.drawImage(imgBackground, bgX + canvas.width, 0, canvas.width, canvas.height);
+            // ----------------------------------
+
+            bird.draw();
+            bird.update();
+
+            // Munculkan pipa setiap 100 frame
+            if (frames % 100 === 0) {
+                let topPipeHeight = Math.random() * (canvas.height - pipeGap - 50) + 20;
+                pipes.push({ x: canvas.width, top: topPipeHeight });
+            }
+
+            drawPipes();
+
+            // Teks Skor di layar utama
+            ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
+            ctx.font = "bold 60px Arial";
+            ctx.fillText(score, canvas.width / 2 - 20, 80);
+
+            frames++;
+            if (!isGameOver) requestAnimationFrame(gameLoop);
+        }
+
+        function endGame() {
+            isGameOver = true; isPlaying = false;
+            uiLayer.style.display = "flex"; gameOverText.style.display = "block";
+            finalScoreText.style.display = "block"; finalScoreText.innerText = "Skor Akhir: " + score;
+            startBtn.innerText = "MAIN LAGI WOI!";
+        }
+
+        function resetGame() {
+            bird.y = 250; bird.velocity = 0; pipes.length = 0; score = 0; frames = 0;
+            bgX = 0; // Reset posisi background juga
+            isGameOver = false; isPlaying = true;
+            uiLayer.style.display = "none"; gameOverText.style.display = "none"; finalScoreText.style.display = "none";
+        }
+
+        startBtn.addEventListener("click", async () => {
+            if (!audioContext) {
+                startBtn.innerText = "MENYIAPKAN MIC...";
+                await setupAudio();
+            }
+            resetGame(); getVolume(); gameLoop();
+        });
+    </script>
+</body>
+</html>
