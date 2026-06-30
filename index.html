@@ -74,52 +74,66 @@
         const finalScoreText = document.getElementById("final-score");
         const volumeBar = document.getElementById("volume-bar");
 
+        // Preload bird image
+        const birdImage = new Image();
+        birdImage.src = "muka-burung-kamu.png";
+        let birdImageLoaded = false;
+        birdImage.onload = () => {
+            birdImageLoaded = true;
+        };
+
         // ==========================================
         // 🎨 FUNCTION UNTUK MENGGAMBAR ASSET
         // ==========================================
         
-        // Fungsi menggambar burung transparan (tanpa background)
+        // Fungsi menggambar burung dengan image
         function drawBird(x, y, width, height) {
             ctx.save();
             ctx.translate(x, y);
             
-            // Kepala burung (kuning)
-            ctx.fillStyle = "#FFD700";
-            ctx.beginPath();
-            ctx.arc(0, -8, 12, 0, Math.PI * 2);
-            ctx.fill();
-            
-            // Mata
-            ctx.fillStyle = "#000";
-            ctx.beginPath();
-            ctx.arc(4, -10, 3, 0, Math.PI * 2);
-            ctx.fill();
-            
-            ctx.fillStyle = "#FFF";
-            ctx.beginPath();
-            ctx.arc(5, -9, 1.5, 0, Math.PI * 2);
-            ctx.fill();
-            
-            // Paruh (merah)
-            ctx.fillStyle = "#FF6347";
-            ctx.beginPath();
-            ctx.moveTo(10, -8);
-            ctx.lineTo(16, -7);
-            ctx.lineTo(10, -5);
-            ctx.closePath();
-            ctx.fill();
-            
-            // Badan burung (kuning)
-            ctx.fillStyle = "#FFD700";
-            ctx.beginPath();
-            ctx.ellipse(0, 5, 10, 14, 0, 0, Math.PI * 2);
-            ctx.fill();
-            
-            // Sayap (oranye)
-            ctx.fillStyle = "#FFA500";
-            ctx.beginPath();
-            ctx.ellipse(-8, 5, 6, 10, -0.3, 0, Math.PI * 2);
-            ctx.fill();
+            if (birdImageLoaded) {
+                // Gambar burung dari image kamu
+                ctx.drawImage(birdImage, -width/2, -height/2, width, height);
+            } else {
+                // Fallback ke gambar primitif jika image belum loaded
+                // Kepala burung (kuning)
+                ctx.fillStyle = "#FFD700";
+                ctx.beginPath();
+                ctx.arc(0, -8, 12, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Mata
+                ctx.fillStyle = "#000";
+                ctx.beginPath();
+                ctx.arc(4, -10, 3, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.fillStyle = "#FFF";
+                ctx.beginPath();
+                ctx.arc(5, -9, 1.5, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Paruh (merah)
+                ctx.fillStyle = "#FF6347";
+                ctx.beginPath();
+                ctx.moveTo(10, -8);
+                ctx.lineTo(16, -7);
+                ctx.lineTo(10, -5);
+                ctx.closePath();
+                ctx.fill();
+                
+                // Badan burung (kuning)
+                ctx.fillStyle = "#FFD700";
+                ctx.beginPath();
+                ctx.ellipse(0, 5, 10, 14, 0, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Sayap (oranye)
+                ctx.fillStyle = "#FFA500";
+                ctx.beginPath();
+                ctx.ellipse(-8, 5, 6, 10, -0.3, 0, Math.PI * 2);
+                ctx.fill();
+            }
             
             ctx.restore();
         }
@@ -255,9 +269,12 @@
         }
 
         function getVolume() {
-            if (!isPlaying) return;
-            // FIX: Guard clause untuk analyser
-            if (!analyser) return;
+            // FIX: Pindahkan guard clause agar tidak nghalangi volume detection
+            if (!analyser) {
+                requestAnimationFrame(getVolume);
+                return;
+            }
+            
             analyser.getByteFrequencyData(dataArray);
             let sum = 0;
             for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
